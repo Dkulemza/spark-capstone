@@ -39,10 +39,10 @@ object DataGenerator {
       warehouses += warehouseGenerator(id, timestamp)
       amountsGenerator(id)
     }
-    writeToCSV(warehouses, "src/main/warehouse-data/warehouses.csv")
+    writeToCSV(warehouses, "src/main/resources/warehouse-data/warehouses.csv")
     writeToCSV(
       amountOfWarehouses,
-      "src/main/warehouse-data/amount_of_warehouses.csv"
+      "src/main/resources/warehouse-data/amount_of_warehouses.csv"
     )
   }
 
@@ -78,7 +78,7 @@ object DataGenerator {
     val csv = new CSVWriter(output)
 
     try {
-       csv.writeAll(data.asJava)
+      csv.writeAll(data.asJava)
     } finally {
       csv.close()
       output.close()

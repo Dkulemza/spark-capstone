@@ -1,60 +1,37 @@
 package statistic.warehouse
 
 import org.apache.spark.sql.functions.{avg, max, min, round}
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SparkSession, Dataset, Row}
+import org.apache.spark.sql.{SparkSession, Dataset, Row}
 
 object Statistic {
 
-  private val warehouseSchema = StructType(
-    List(
-      StructField("positionId", LongType),
-      StructField("warehouse", StringType),
-      StructField("product", StringType),
-      StructField("eventTime", LongType)
-    )
-  )
-
-  private val amountSchema = StructType(
-    List(
-      StructField("positionId", LongType),
-      StructField("amount", DecimalType(10, 2)),
-      StructField("eventTime", LongType)
-    )
-  )
+  val spark = SparkSession
+    .builder()
+    .appName("Warehouse statistics")
+    .master("local[*]")
+    .config("spark.driver.bindAddress", "localhost")
+    .getOrCreate()
 
   def main(args: Array[String]): Unit = {
-    val spark = SparkSession
-      .builder()
-      .appName("Warehouse statistics")
-      .master("local[*]")
-      .config("spark.driver.bindAddress", "localhost")
-      .getOrCreate()
+    getCurrentAmountOfEachPosition(
+      "src/main/resources/warehouse-data/amount_of_warehouses.csv",
+      "src/main/resources/warehouse-data/warehouses.csv"
+    ).show
 
-    val warehousesDF = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(warehouseSchema)
-      .load("src/main/warehouse-data/warehouses.csv")
-      .toDF()
-
-    val amountOfWarehouseDF = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(amountSchema)
-      .load("src/main/warehouse-data/amount_of_warehouses.csv")
-      .toDF()
-
-    getCurrentAmountOfEachPosition(warehousesDF, amountOfWarehouseDF).show
-
-    getStatistics(warehousesDF, amountOfWarehouseDF).show
+    getStatistics(
+      "src/main/resources/warehouse-data/amount_of_warehouses.csv",
+      "src/main/resources/warehouse-data/warehouses.csv"
+    ).show
 
   }
 
   private def getCurrentAmountOfEachPosition(
-    warehousesDF: DataFrame,
-    amountOfWarehouseDF: DataFrame
+    amountPath: String,
+    warehousePath: String
   ): Dataset[Row] = {
+    val warehousesDF = DataReader.readWarehouseData(warehousePath)
+    val amountOfWarehouseDF = DataReader.readAmountOfWarehouse(amountPath)
+
     val maxAmountTimeDf = amountOfWarehouseDF
       .groupBy("positionId")
       .agg(max("eventTime").as("eventTime"))
@@ -68,8 +45,11 @@ object Statistic {
       .orderBy("positionId")
   }
 
-  private def getStatistics(warehousesDF: DataFrame,
-                            amountOfWarehouseDF: DataFrame): Dataset[Row] = {
+  private def getStatistics(amountPath: String,
+                            warehousePath: String): Dataset[Row] = {
+
+    val warehousesDF = DataReader.readWarehouseData(warehousePath)
+    val amountOfWarehouseDF = DataReader.readAmountOfWarehouse(amountPath)
 
     val calculatedStatistics = amountOfWarehouseDF
       .groupBy("positionId")

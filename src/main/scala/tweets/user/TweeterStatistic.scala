@@ -2,47 +2,47 @@ package tweets.user
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{desc, count, col, asc}
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.{Dataset, Row}
 
 object TweeterStatistic {
 
-  private val spark: SparkSession =
+  val spark: SparkSession =
     SparkSession.builder().master("local").getOrCreate()
 
-  private val userDf = spark.read
-    .format("avro")
-    .load("src/main/twitter-data/user_dir.avro")
-    .toDF()
-
-  private val messageDf = spark.read
-    .format("avro")
-    .load("src/main/twitter-data/message_dir.avro")
-    .toDF()
-
-  private val messageUserDf = spark.read
-    .format("avro")
-    .load("src/main/twitter-data/message_user.avro")
-    .toDF()
-
-  private val retweetDf = spark.read
-    .format("avro")
-    .load("src/main/twitter-data/retweet.avro")
-    .toDF()
-
-  private val userMessage = userDf
-    .join(messageUserDf.join(messageDf, Seq("MESSAGE_ID")), Seq("USER_ID"))
-
   def main(args: Array[String]): Unit = {
-    val firstWaveTopTen = getFirstWaveTopTen
+    val firstWaveTopTen = calculateFirstWaveTopTen(
+      "src/main/resources/twitter-data/retweet.avro",
+      "src/main/resources/twitter-data/message_user.avro",
+      "src/main/resources/twitter-data/user_dir.avro",
+      "src/main/resources/twitter-data/message_dir.avro"
+    )
+
     firstWaveTopTen.show
 
-    val secondWaveTopTen = getSecondWaveTopTen
+    val secondWaveTopTen = calculateSecondWaveTopTen(
+      "src/main/resources/twitter-data/retweet.avro",
+      "src/main/resources/twitter-data/message_user.avro",
+      "src/main/resources/twitter-data/user_dir.avro",
+      "src/main/resources/twitter-data/message_dir.avro"
+    )
 
     secondWaveTopTen.show
 
   }
 
-  def getFirstWaveTopTen: Dataset[Row] = {
+  def calculateFirstWaveTopTen(retweetPath: String,
+                               messageUserPath: String,
+                               userPath: String,
+                               messagePath: String): Dataset[Row] = {
+
+    val userDf = TweeterReader.readUserData(userPath)
+    val messageDf = TweeterReader.readMessageData(messagePath)
+    val messageUserDf = TweeterReader.readMessageUserData(messageUserPath)
+    val retweetDf = TweeterReader.readRetweetData(retweetPath)
+
+    val userMessage = userDf
+      .join(messageUserDf.join(messageDf, Seq("MESSAGE_ID")), Seq("USER_ID"))
+
     val firstTopTen =
       retweetDf.groupBy("USER_ID").agg(count("*").as("NUMBER_RETWEETS"))
 
@@ -61,7 +61,19 @@ object TweeterStatistic {
 
   }
 
-  def getSecondWaveTopTen: Dataset[Row] = {
+  def calculateSecondWaveTopTen(retweetPath: String,
+                                messageUserPath: String,
+                                userPath: String,
+                                messagePath: String): Dataset[Row] = {
+
+    val userDf = TweeterReader.readUserData(userPath)
+    val messageDf = TweeterReader.readMessageData(messagePath)
+    val messageUserDf = TweeterReader.readMessageUserData(messageUserPath)
+    val retweetDf = TweeterReader.readRetweetData(retweetPath)
+
+    val userMessage = userDf
+      .join(messageUserDf.join(messageDf, Seq("MESSAGE_ID")), Seq("USER_ID"))
+
     val secondWave = retweetDf
       .as("retweet1")
       .join(
@@ -90,5 +102,4 @@ object TweeterStatistic {
       .limit(10)
 
   }
-
 }
